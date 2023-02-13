@@ -1,6 +1,9 @@
 package httpbuilder
 
 import (
+	"bytes"
+	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -71,6 +74,22 @@ func Test_Cors(t *testing.T) {
 				"Access-Control-Allow-Headers":     "*",
 				"Access-Control-Allow-Methods":     "",
 				"Access-Control-Allow-Credentials": "*",
+			},
+		},
+		"unmarshal_config": {
+			endpoint: emptyHandlerFunc,
+			config: func(c *CorsConfig) {
+				documentBody := `{"allowOrigins":["my-site.com","localhost"],"allowMethods": ["GET","POST"],"allowHeaders": ["Accept","Upgrade"],"allowCredentials":["false"]}`
+				document := bytes.NewReader([]byte(documentBody))
+				if err := json.NewDecoder(document).Decode(c); err != nil {
+					log.Fatalf("invalid json body, check test 'Test_Cors/unmarshal_config': %v", err)
+				}
+			},
+			expected: map[string]string{
+				"Access-Control-Allow-Origin":      "my-site.com, localhost",
+				"Access-Control-Allow-Headers":     "Accept, Upgrade",
+				"Access-Control-Allow-Methods":     "GET, POST",
+				"Access-Control-Allow-Credentials": "false",
 			},
 		},
 	}

@@ -8,6 +8,87 @@ import (
 
 func emptyHandlerFunc(w http.ResponseWriter, r *http.Request) {}
 
+func Test_RunBeforeAndAfter(t *testing.T) {
+	tests := map[string]struct {
+		Endpoint  http.HandlerFunc
+		AddBefore []http.HandlerFunc
+		AddAfter  []http.HandlerFunc
+		Expected  string
+	}{
+		"empty_sets": {
+			Endpoint:  func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("hello, world")) },
+			AddBefore: []http.HandlerFunc{},
+			AddAfter:  []http.HandlerFunc{},
+			Expected:  "hello, world",
+		},
+		"run_before": {
+			Endpoint: func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("1")) },
+			AddBefore: []http.HandlerFunc{
+				func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("0 - ")) },
+			},
+			AddAfter: []http.HandlerFunc{},
+			Expected: "0 - 1",
+		},
+		"run_before_multi": {
+			Endpoint: func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("2")) },
+			AddBefore: []http.HandlerFunc{
+				func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("0 - ")) },
+				func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("1 - ")) },
+			},
+			AddAfter: []http.HandlerFunc{},
+			Expected: "0 - 1 - 2",
+		},
+		"run_after": {
+			Endpoint:  func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("1")) },
+			AddBefore: []http.HandlerFunc{},
+			AddAfter: []http.HandlerFunc{
+				func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(" - 2")) },
+			},
+			Expected: "1 - 2",
+		},
+		"run_after_multi": {
+			Endpoint:  func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("1")) },
+			AddBefore: []http.HandlerFunc{},
+			AddAfter: []http.HandlerFunc{
+				func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(" - 3")) },
+				func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(" - 2")) },
+			},
+			Expected: "1 - 2 - 3",
+		},
+		"hard_mode": {
+			Endpoint: func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("2")) },
+			AddBefore: []http.HandlerFunc{
+				func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("0 - ")) },
+				func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("1 - ")) },
+			},
+			AddAfter: []http.HandlerFunc{
+				func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(" - 4")) },
+				func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(" - 3")) },
+			},
+			Expected: "0 - 1 - 2 - 3 - 4",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			w, r := httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil)
+			builder := FromFunc(test.Endpoint)
+			for _, function := range test.AddBefore {
+				builder.WithMiddleware(RunBefore(function))
+			}
+			for _, function := range test.AddAfter {
+				builder.WithMiddleware(RunAfter(function))
+			}
+			endpoint := builder.Build()
+			endpoint(w, r)
+
+			if got := w.Body.String(); got != test.Expected {
+				t.Errorf("result missmatch:\n\tExpected: %v\n\tGot: %v", test.Expected, got)
+			}
+		})
+	}
+}
+
 func Test_FunctionBuilder(t *testing.T) {
 	tests := map[string]struct {
 		Endpoint    http.HandlerFunc
@@ -203,7 +284,7 @@ func Test_ToMiddleware(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			builder := FromHandler(test.Handler)
 			for _, middleware := range test.Middlewares {
-				builder.WithMiddleware(ToMiddleware(middleware))
+				builder.WithMiddleware(RunBefore(middleware))
 			}
 			endpoint := builder.Build()
 			w, r := httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil)

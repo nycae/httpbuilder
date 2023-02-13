@@ -21,10 +21,10 @@ func (l headerList) ToHeader() string {
 }
 
 type CorsConfig struct {
-	AllowOrigins     headerList `yaml:"allowOrigins"`
-	AllowHeaders     headerList `yaml:"allowHeaders"`
-	AllowMethods     headerList `yaml:"allowMethods"`
-	AllowCredentials headerList `yaml:"allowCredentials"`
+	AllowOrigins     headerList `json:"allowOrigins"`
+	AllowHeaders     headerList `json:"allowHeaders"`
+	AllowMethods     headerList `json:"allowMethods"`
+	AllowCredentials headerList `json:"allowCredentials"`
 }
 
 type CorsConfigCallback func(*CorsConfig)
@@ -38,7 +38,7 @@ func Cors(userConfig CorsConfigCallback) Middleware {
 	if userConfig != nil {
 		userConfig(&config)
 	}
-	return ToMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	return RunBefore(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", config.AllowOrigins.ToHeader())
 		w.Header().Set("Access-Control-Allow-Headers", config.AllowHeaders.ToHeader())
 		w.Header().Set("Access-Control-Allow-Methods", config.AllowMethods.ToHeader())

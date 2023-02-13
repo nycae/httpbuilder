@@ -35,11 +35,20 @@ func FromHandler(handler http.Handler) *Builder {
 	}
 }
 
-func ToMiddleware(handler http.HandlerFunc) Middleware {
+func RunBefore(handler http.HandlerFunc) Middleware {
 	return func(innerHandler http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			handler(w, r)
 			innerHandler(w, r)
+		}
+	}
+}
+
+func RunAfter(handler http.HandlerFunc) Middleware {
+	return func(innerHandler http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			innerHandler(w, r)
+			handler(w, r)
 		}
 	}
 }
